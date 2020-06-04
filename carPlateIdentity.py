@@ -9,93 +9,6 @@ char_table = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', '
               '桂', '黑', '沪', '冀', '津', '京', '吉', '辽', '鲁', '蒙', '闽', '宁', '青', '琼', '陕', '苏', '晋',
               '皖', '湘', '新', '豫', '渝', '粤', '云', '藏', '浙']
 
-watch_cascade = cv2.CascadeClassifier('cascade.xml')
-
-def Img_Outline(original_img):
-    gray_img = cv2.cvtColor(original_img, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray_img, (9, 9), 0)                     # 高斯模糊去噪（设定卷积核大小影响效果）
-    _, RedThresh = cv2.threshold(blurred, 165, 255, cv2.THRESH_BINARY)  # 设定阈值165（阈值影响开闭运算效果）
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))          # 定义矩形结构元素
-    closed = cv2.morphologyEx(RedThresh, cv2.MORPH_CLOSE, kernel)       # 闭运算（链接块）
-    opened = cv2.morphologyEx(closed, cv2.MORPH_OPEN, kernel)           # 开运算（去噪点）
-    return original_img, opened
-
-
-def findContours_img(original_img, opened):
-    contours, hierarchy = cv2.findContours(opened, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    c = sorted(contours, key=cv2.contourArea, reverse=True)[1]          # 计算最大轮廓的旋转包围盒
-    rect = cv2.minAreaRect(c)
-    angle = rect[2]
-    print("angle",angle)
-    box = np.int0(cv2.boxPoints(rect))
-    draw_img = cv2.drawContours(original_img.copy(), [box], -1, (0, 0, 255), 3)
-    rows, cols = original_img.shape[:2]
-    M = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-    result_img = cv2.warpAffine(original_img, M, (cols, rows))
-    return result_img
-
-def detectPlateRough(image_gray,resize_h = 720,en_scale =1.08 ,top_bottom_padding_rate = 0.05):
-        if top_bottom_padding_rate>0.2:
-            print("error:top_bottom_padding_rate > 0.2:",top_bottom_padding_rate)
-            exit(1)
-        height = image_gray.shape[0]
-        padding = int(height*top_bottom_padding_rate)
-        scale = image_gray.shape[1]/float(image_gray.shape[0])
-        image = cv2.resize(image_gray, (int(scale*resize_h), resize_h))
-        image_color_cropped = image[padding:resize_h-padding,0:image_gray.shape[1]]
-        image_gray = cv2.cvtColor(image_color_cropped,cv2.COLOR_RGB2GRAY)
-        watches = watch_cascade.detectMultiScale(image_gray, en_scale, 2, minSize=(36, 9),maxSize=(36*40, 9*40))
-        cropped_images = []
-        for (x, y, w, h) in watches:
-
-            #cv2.rectangle(image_color_cropped, (x, y), (x + w, y + h), (0, 0, 255), 1)
-
-            x -= w * 0.14
-            w += w * 0.28
-            y -= h * 0.15
-            h += h * 0.3
-
-            #cv2.rectangle(image_color_cropped, (int(x), int(y)), (int(x + w), int(y + h)), (0, 0, 255), 1)
-
-            cropped = cropImage(image_color_cropped, (int(x), int(y), int(w), int(h)))
-            cropped_images.append(cropped)
-            #cropped_images.append([cropped,[x, y+padding, w, h]])
-            #cv2.imshow("imageShow", cropped)
-            #cv2.waitKey(0)
-        return cropped_images
-
-def cropImage(image,rect):
-        #cv2.imshow("imageShow", image)
-        #cv2.waitKey(0)
-        x, y, w, h = computeSafeRegion(image.shape,rect)
-        cv2.imshow("imageShow", image[y:y+h,x:x+w])
-        cv2.waitKey(0)
-        return image[y:y+h,x:x+w]
-
-
-def computeSafeRegion(shape,bounding_rect):
-        top = bounding_rect[1] # y
-        bottom  = bounding_rect[1] + bounding_rect[3] # y +  h
-        left = bounding_rect[0] # x
-        right =   bounding_rect[0] + bounding_rect[2] # x +  w
-        min_top = 0
-        max_bottom = shape[0]
-        min_left = 0
-        max_right = shape[1]
-
-        #print(left,top,right,bottom)
-        #print(max_bottom,max_right)
-
-        if top < min_top:
-            top = min_top
-        if left < min_left:
-            left = min_left
-        if bottom > max_bottom:
-            bottom = max_bottom
-        if right > max_right:
-            right = max_right
-        return [left,top,right-left,bottom-top]
-
 def hist_image(img):
     assert img.ndim==2
     hist = [0 for i in range(256)]
@@ -140,9 +53,10 @@ def find_board_area(img):
             break
     return left,top,120,bottom-top-10
 
+# 确定找到的区域是否为车牌
 def verify_scale(rotate_rect):
    error = 0.4
-   aspect = 4#4.7272
+   aspect = 4 #4.7272
    min_area = 10*(10*aspect)
    max_area = 150*(150*aspect)
    min_aspect = aspect*(1-error)
@@ -164,8 +78,6 @@ def verify_scale(rotate_rect):
    return False
 
 def img_Transform(car_rect,image):
-    cv2.imshow('image',image)
-    cv2.waitKey(0)
     img_h,img_w = image.shape[:2]
     rect_w,rect_h = car_rect[1][0],car_rect[1][1]
     angle = car_rect[2]
@@ -214,37 +126,37 @@ def img_Transform(car_rect,image):
 
     return car_img
 
+#预处理
 def pre_process(orig_img):
-
+    #灰度图
     gray_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2GRAY)
     #cv2.imshow('gray_img', gray_img)
-
+    # 均值滤波（柔化一些小噪声点）
     blur_img = cv2.blur(gray_img, (3, 3))
     #cv2.imshow('blur', blur_img)
-
+    # sobel获取垂直边缘
     sobel_img = cv2.Sobel(blur_img, cv2.CV_16S, 1, 0, ksize=3)
-    sobel_img = cv2.convertScaleAbs(sobel_img)
+    sobel_img = cv2.convertScaleAbs(sobel_img)# 把结果映射回uint8格式
     #cv2.imshow('sobel', sobel_img)
-
+    # 颜色空间转换：成HSV格式：色调（H），饱和度（S），明度（V）。
     hsv_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2HSV)
 
     h, s, v = hsv_img[:, :, 0], hsv_img[:, :, 1], hsv_img[:, :, 2]
-    # 黄色色调区间[26，34],蓝色色调区间:[100,124]
+    # 黄色色调区间[26，34],蓝色色调区间:[100,124]——这一步是规定了车牌的特征，并找车牌框
     blue_img = (((h > 26) & (h < 34)) | ((h > 100) & (h < 124))) & (s > 70) & (v > 70)
     blue_img = blue_img.astype('float32')
-    cv2.imshow('blue', blue_img)
 
     mix_img = np.multiply(sobel_img, blue_img)
-    cv2.imshow('mix', mix_img)
-
+    #cv2.imshow('mix', mix_img)
+    #混合找车牌
     mix_img = mix_img.astype(np.uint8)
-
+    #二值化
     ret, binary_img = cv2.threshold(mix_img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
     cv2.imshow('binary',binary_img)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(21,5))
     close_img = cv2.morphologyEx(binary_img, cv2.MORPH_CLOSE, kernel)
-    #cv2.imshow('close', close_img)
+    cv2.imshow('close', close_img)
     return close_img
 
 # 给候选车牌区域做漫水填充算法，一方面补全上一步求轮廓可能存在轮廓歪曲的问题，
@@ -335,7 +247,8 @@ def locate_carPlate(orig_img,pred_image):
     carPlate_list = []
     temp1_orig_img = orig_img.copy() #调试用
     temp2_orig_img = orig_img.copy() #调试用
-    contours,heriachy = cv2.findContours(pred_image,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    #找轮廓
+    cloneimage,contours,heriachy = cv2.findContours(pred_image,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
     for i,contour in enumerate(contours):
         cv2.drawContours(temp1_orig_img, contours, i, (0, 255, 255), 2)
         # 获取轮廓最小外接矩形，返回值rotate_rect
@@ -371,7 +284,7 @@ def horizontal_cut_chars(plate):
         sum = 0
         for i in range(img.shape[0]):
             sum += round(img[i,col]/255)
-        return sum;
+        return sum
 
     sum = 0
     for col in range(img_w):
@@ -456,8 +369,8 @@ def get_chars(car_plate):
     chars_top,chars_bottom = h_proj_list[h_maxIndex][0],h_proj_list[h_maxIndex][1]
 
     plates = car_plate[chars_top:chars_bottom+1,:]
-    cv2.imwrite('./carIdentityData/opencv_output/car.jpg',car_plate)
-    cv2.imwrite('./carIdentityData/opencv_output/plate.jpg', plates)
+    cv2.imwrite('carIdentityData/opencv_output/car.jpg',car_plate)
+    cv2.imwrite('carIdentityData/opencv_output/plate.jpg', plates)
     char_addr_list = horizontal_cut_chars(plates)
 
     for i,addr in enumerate(char_addr_list):
@@ -489,9 +402,13 @@ def cnn_select_carPlate(plate_list,model_path):
 
             input_x = np.array(plate_list)
             net_outs = tf.nn.softmax(net1_out)
-            preds = tf.argmax(net_outs,1) #预测结果
-            probs = tf.reduce_max(net_outs,reduction_indices=[1]) #结果概率值
+            preds = tf.argmax(net_outs,1) #预测结果 计算最大值的位置索引
+            # print(preds)
+            probs = tf.reduce_max(net_outs,reduction_indices=[1]) #结果概率值 计算最大值
+            # print(probs)
             pred_list,prob_list = sess1.run([preds,probs],feed_dict={net1_x_place:input_x,net1_keep_place:1.0})
+            # print(pred_list)
+            # print(prob_list)
             # 选出概率最大的车牌
             result_index,result_prob = -1,0.
             for i,pred in enumerate(pred_list):
@@ -502,13 +419,17 @@ def cnn_select_carPlate(plate_list,model_path):
             else:
                 return True,plate_list[result_index]
 
+
 def cnn_recongnize_char(img_list,model_path):
+    if len(img_list) != 7:
+        print("未检测到完整车牌")
     g2 = tf.Graph()
     sess2 = tf.Session(graph=g2)
     text_list = []
-
+    text_list1 = []
+    text_list2 = []
     if len(img_list) == 0:
-        return text_list
+        return text_list, text_list1, text_list2
     with sess2.as_default():
         with sess2.graph.as_default():
             model_dir = os.path.dirname(model_path)
@@ -518,34 +439,86 @@ def cnn_recongnize_char(img_list,model_path):
             net2_x_place = graph.get_tensor_by_name('x_place:0')
             net2_keep_place = graph.get_tensor_by_name('keep_place:0')
             net2_out = graph.get_tensor_by_name('out_put:0')
-
             data = np.array(img_list)
             # 数字、字母、汉字，从67维向量找到概率最大的作为预测结果
-            net_out = tf.nn.softmax(net2_out)
-            preds = tf.argmax(net_out,1)
-            my_preds= sess2.run(preds, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
+            net_out = tf.nn.softmax(net2_out)  # 这一步是明显化不同值之间的差距
+            net_list = sess2.run(net_out, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
+            pred_list = [[], [], [], [], [], [], []]
+            pred_res = [[], [], [], [], [], [], []]
+            num = 0
+            for i in net_list:
+                i = list(i)
+                # print(i)
+                # print(type(i))
+                temp = [e for e in i]
+                temp.sort(reverse=True)
+                # print(temp)
+                for j in range(3):
+                    if num == 0:  # 汉字
+                        if i.index(temp[j]) < 36:
+                            # print("第一个不是汉字")
+                            # print(i.index(temp[j]))
+                            continue
+                    elif num == 1:  # 字母
+                        if i.index(temp[j]) > 35 or i.index(temp[j]) < 10:
+                            # print("第二个不是字母")
+                            # print(i.index(temp[j]))
+                            continue
+                    pred_list[num].append(i.index(temp[j]))
+                    pred_res[num].append(temp[j])
+                if pred_list[num] == []:
+                    print("车牌字符识别错误:")
+                    print(num)
+                num += 1
+            for i in range(7):
+                res = 0
+                for j in range(len(pred_list[i])):
+                    if res == 0:
+                        res = pred_res[i][j]  # 记录最高概率
+                        text_list.append(char_table[pred_list[i][j]])
+                        continue
+                    if res - pred_res[i][j] < 0.05:  # 相差在0.05以内
+                        if len(text_list1) == i:  # 第二个备选没记录
+                            text_list1.append(char_table[pred_list[i][j]])
+                        else:
+                            text_list2.append(char_table[pred_list[i][j]])
+                        res = pred_res[i][j]
+                    elif len(text_list1) == i:
+                        text_list1.append(text_list[i])
+                    else:
+                        text_list2.append(text_list[i])
+            return text_list, text_list1, text_list2
+                # data = np.array(img_list)
+                # # 数字、字母、汉字，从67维向量找到概率最大的作为预测结果
+                # net_out = tf.nn.softmax(net2_out)
+                # net_list = sess2.run(net_out, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
+                # # print(net_list)
+                # preds = tf.argmax(net_out, 1)
+                # probs = tf.reduce_max(net_out, reduction_indices=[1])  # 结果概率值
+                # pred_list, prob_list = sess2.run([preds, probs], feed_dict={net2_x_place: data, net2_keep_place: 1.0})
+                # # print(pred_list)
+                # # print(prob_list)
+                # for i in pred_list:
+                #     text_list.append(char_table[i])
+                # return text_list,text_list1,text_list2
 
-            for i in my_preds:
-                text_list.append(char_table[i])
-            return text_list
 
 if __name__ == '__main__':
     cur_dir = sys.path[0]
     car_plate_w,car_plate_h = 136,36
     char_w,char_h = 20,20
-    plate_model_path = os.path.join(cur_dir, 'carIdentityData\model\plate_recongnize\model.ckpt-530.meta')
+    plate_model_path = os.path.join(cur_dir, 'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
+    # print(plate_model_path)
     #plate_model_path = tf.train.latest_checkpoint(plate_model_path)
     #plate_model_path = os.path.join(plate_model_path,".meta")
-    char_model_path = os.path.join(cur_dir,'carIdentityData\model\char_recongnize\model.ckpt-580.meta')
+    char_model_path = os.path.join(cur_dir,'carIdentityData\model\char_recongnize\model.ckpt-690.meta')
     #char_model_path = tf.train.latest_checkpoint(char_model_path)
     #char_model_path = os.path.join(char_model_path,".meta")
-    img = cv2.imread('./carIdentityData/images/21.jpg')
-    #a = img.shape
-    #img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
-    images = detectPlateRough(img,img.shape[0],top_bottom_padding_rate=0.1)
-    img = images[0]
-    original_img, opened = Img_Outline(img)
-    img = findContours_img(original_img, opened)
+    img = cv2.imread('carIdentityData/images/4.jpg')
+    a = img.shape
+    img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
+    # cv2.imshow('a',img)
+    # cv2.waitKey(0)
     # 预处理
     pred_img = pre_process(img)
     # 车牌定位
@@ -562,7 +535,16 @@ if __name__ == '__main__':
     char_img_list = extract_char(car_plate)
 
     # CNN字符识别
-    text = cnn_recongnize_char(char_img_list,char_model_path)
-    print(text)
+    text,text1,text2 = cnn_recongnize_char(char_img_list,char_model_path)
+    if text1 != []:
+        print("对结果的可能性排序：")
+        print(text)
+        print(text1)
+        if text2 != []:
+            print(text2)
+    else:
+        print("识别结果：")
+        print(text)
+
 
     cv2.waitKey(0)

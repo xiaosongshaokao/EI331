@@ -23,6 +23,7 @@ def Img_Outline(original_img):
 
 def findContours_img(original_img, opened):
     contours, hierarchy = cv2.findContours(opened, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    # 注意这里两个与三个参数的差别是opencv版本的差别，如果报错请更新版本
     c = sorted(contours, key=cv2.contourArea, reverse=True)[1]          # 计算最大轮廓的旋转包围盒
     rect = cv2.minAreaRect(c)
     angle = rect[2]
@@ -584,8 +585,8 @@ if __name__ == '__main__':
     img = cv2.imread('carIdentityData/images/1.jpg')
     #a = img.shape
     #img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
-    cv2.imshow('a', img)
-    cv2.waitKey(0)
+    # cv2.imshow('a', img)
+    # cv2.waitKey(0)
     images = detectPlateRough(img,img.shape[0],top_bottom_padding_rate=0.1)
     img = images[0]
     original_img, opened = Img_Outline(img)

@@ -503,12 +503,15 @@ def cnn_select_carPlate(plate_list,model_path):
                 return True,plate_list[result_index]
 
 def cnn_recongnize_char(img_list,model_path):
+    if len(img_list) != 7:
+        print("未检测到完整车牌")
     g2 = tf.Graph()
     sess2 = tf.Session(graph=g2)
     text_list = []
-
+    text_list1 = []
+    text_list2 = []
     if len(img_list) == 0:
-        return text_list
+        return text_list, text_list1, text_list2
     with sess2.as_default():
         with sess2.graph.as_default():
             model_dir = os.path.dirname(model_path)
@@ -518,30 +521,71 @@ def cnn_recongnize_char(img_list,model_path):
             net2_x_place = graph.get_tensor_by_name('x_place:0')
             net2_keep_place = graph.get_tensor_by_name('keep_place:0')
             net2_out = graph.get_tensor_by_name('out_put:0')
-
             data = np.array(img_list)
             # 数字、字母、汉字，从67维向量找到概率最大的作为预测结果
-            net_out = tf.nn.softmax(net2_out)
-            preds = tf.argmax(net_out,1)
-            my_preds= sess2.run(preds, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
-
-            for i in my_preds:
-                text_list.append(char_table[i])
-            return text_list
+            net_out = tf.nn.softmax(net2_out)  # 这一步是明显化不同值之间的差距
+            net_list = sess2.run(net_out, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
+            pred_list = [[], [], [], [], [], [], []]
+            pred_res = [[], [], [], [], [], [], []]
+            num = 0
+            for i in net_list:
+                i = list(i)
+                # print(i)
+                # print(type(i))
+                temp = [e for e in i]
+                temp.sort(reverse=True)
+                # print(temp)
+                for j in range(3):
+                    if num == 0:  # 汉字
+                        if i.index(temp[j]) < 36:
+                            # print("第一个不是汉字")
+                            # print(i.index(temp[j]))
+                            continue
+                    elif num == 1:  # 字母
+                        if i.index(temp[j]) > 35 or i.index(temp[j]) < 10:
+                            # print("第二个不是字母")
+                            # print(i.index(temp[j]))
+                            continue
+                    pred_list[num].append(i.index(temp[j]))
+                    pred_res[num].append(temp[j])
+                if pred_list[num] == []:
+                    print("车牌字符识别错误:")
+                    print(num)
+                num += 1
+            for i in range(7):
+                res = 0
+                for j in range(len(pred_list[i])):
+                    if res == 0:
+                        res = pred_res[i][j]  # 记录最高概率
+                        text_list.append(char_table[pred_list[i][j]])
+                        continue
+                    if res - pred_res[i][j] < 0.05:  # 相差在0.05以内
+                        if len(text_list1) == i:  # 第二个备选没记录
+                            text_list1.append(char_table[pred_list[i][j]])
+                        else:
+                            text_list2.append(char_table[pred_list[i][j]])
+                        res = pred_res[i][j]
+                    elif len(text_list1) == i:
+                        text_list1.append(text_list[i])
+                    else:
+                        text_list2.append(text_list[i])
+            return text_list, text_list1, text_list2
 
 if __name__ == '__main__':
     cur_dir = sys.path[0]
     car_plate_w,car_plate_h = 136,36
     char_w,char_h = 20,20
-    plate_model_path = os.path.join(cur_dir, 'carIdentityData\model\plate_recongnize\model.ckpt-530.meta')
+    plate_model_path = os.path.join(cur_dir, 'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
     #plate_model_path = tf.train.latest_checkpoint(plate_model_path)
     #plate_model_path = os.path.join(plate_model_path,".meta")
-    char_model_path = os.path.join(cur_dir,'carIdentityData\model\char_recongnize\model.ckpt-580.meta')
+    char_model_path = os.path.join(cur_dir,'carIdentityData\model\char_recongnize\model.ckpt-690.meta')
     #char_model_path = tf.train.latest_checkpoint(char_model_path)
     #char_model_path = os.path.join(char_model_path,".meta")
-    img = cv2.imread('./carIdentityData/images/21.jpg')
+    img = cv2.imread('carIdentityData/images/1.jpg')
     #a = img.shape
     #img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
+    cv2.imshow('a', img)
+    cv2.waitKey(0)
     images = detectPlateRough(img,img.shape[0],top_bottom_padding_rate=0.1)
     img = images[0]
     original_img, opened = Img_Outline(img)
@@ -562,7 +606,15 @@ if __name__ == '__main__':
     char_img_list = extract_char(car_plate)
 
     # CNN字符识别
-    text = cnn_recongnize_char(char_img_list,char_model_path)
-    print(text)
+    text, text1, text2 = cnn_recongnize_char(char_img_list, char_model_path)
+    if text1 != []:
+        print("对结果的可能性排序：")
+        print(text)
+        print(text1)
+        if text2 != []:
+            print(text2)
+    else:
+        print("识别结果：")
+        print(text)
 
     cv2.waitKey(0)

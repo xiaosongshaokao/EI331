@@ -24,3 +24,7 @@ Car Plate Detect
 - 训练模型的名字也可能不一样
 
 - opencv版本请保持在4.0以上
+
+- 第27行```c = sorted(contours, key=cv2.contourArea, reverse=True)[1]```一句在跑某些图片的时候会报错
+
+Git测试

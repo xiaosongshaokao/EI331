@@ -582,7 +582,7 @@ if __name__ == '__main__':
     char_model_path = os.path.join(cur_dir,'carIdentityData\model\char_recongnize\model.ckpt-690.meta')
     #char_model_path = tf.train.latest_checkpoint(char_model_path)
     #char_model_path = os.path.join(char_model_path,".meta")
-    img = cv2.imread('carIdentityData/images/1.jpg')
+    img = cv2.imread('carIdentityData/images/21.jpg')
     #a = img.shape
     #img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
     # cv2.imshow('a', img)

@@ -1,6 +1,6 @@
 ## EI331 Final Project ##
 
-Car Plate Detect
+Car Plate Detect uisng OpenCv
 
 ### 代码食用说明 ###
 

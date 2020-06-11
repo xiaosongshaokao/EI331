@@ -6,9 +6,6 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-alphabets = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-             'U', 'V', 'W', 'X', 'Y', 'Z']
 chinese = ['zh_cuan', 'zh_e', 'zh_gan', 'zh_gan1', 'zh_gui', 'zh_gui1', 'zh_hei', 'zh_hu', 'zh_ji', 'zh_jin',
            'zh_jing', 'zh_jl', 'zh_liao', 'zh_lu', 'zh_meng', 'zh_min', 'zh_ning', 'zh_qing', 'zh_qiong',
            'zh_shan', 'zh_su', 'zh_sx', 'zh_wan', 'zh_xiang', 'zh_xin', 'zh_yu', 'zh_yu1', 'zh_yue', 'zh_yun',
@@ -17,7 +14,7 @@ chinese = ['zh_cuan', 'zh_e', 'zh_gan', 'zh_gan1', 'zh_gui', 'zh_gui1', 'zh_hei'
 
 class char_cnn_net:
     def __init__(self):
-        self.dataset = numbers + alphabets + chinese
+        self.dataset = chinese
         self.dataset_len = len(self.dataset)
         self.img_size = 20
         self.y_size = len(self.dataset)
@@ -151,15 +148,19 @@ class char_cnn_net:
         files = self.list_all_files(dir)
 
         for file in files:
+            # 获取图片文件全目录
+            cur_dir = os.path.dirname(file)
+            # 获取图片文件上一级目录名
+            dir_name = os.path.split(cur_dir)[-1]
+            # 仅需要汉字部分数据
+            if not dir_name.startswith("zh"):
+                continue
             src_img = cv2.imread(file, cv2.COLOR_BGR2GRAY)
             if src_img.ndim == 3:
                 continue
             resize_img = cv2.resize(src_img, (20, 20))
             X.append(resize_img)
-            # 获取图片文件全目录
-            cur_dir = os.path.dirname(file)
-            # 获取图片文件上一级目录名
-            dir_name = os.path.split(cur_dir)[-1]
+
             vector_y = [0 for i in range(len(self.dataset))]
             index_y = self.dataset.index(dir_name)
             vector_y[index_y] = 1
@@ -176,13 +177,16 @@ class char_cnn_net:
             raise ValueError('没有找到文件夹')
         files = self.list_all_files(test_dir)
         for file in files:
+            cur_dir = os.path.dirname(file)
+            dir_name = os.path.split(cur_dir)[-1]
+            if not dir_name.startswith("zh"):
+                continue
             src_img = cv2.imread(file, cv2.COLOR_BGR2GRAY)
             if src_img.ndim == 3:
                 continue
             resize_img = cv2.resize(src_img, (20, 20))
             test_X.append(resize_img)
-            cur_dir = os.path.dirname(file)
-            dir_name = os.path.split(cur_dir)[-1]
+
             vector_y = [0 for i in range(len(self.dataset))]
             index_y = self.dataset.index(dir_name)
             vector_y[index_y] = 1
@@ -197,8 +201,8 @@ if __name__ == '__main__':
     data_dir = os.path.join(cur_dir, r'carIdentityData\cnn_char_train')
     print(data_dir)
     test_dir = os.path.join(cur_dir, r'carIdentityData\cnn_char_test')
-    train_model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize\model.ckpt')
-    model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize')
+    train_model_path = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize\model.ckpt')
+    model_path = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize')
 
     train_flag = 0
     net = char_cnn_net()

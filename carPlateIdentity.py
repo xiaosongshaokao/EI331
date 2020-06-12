@@ -4,7 +4,6 @@ import sys
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from pdb import set_trace
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # 0~9:num, 10~35:letter, 36~66: char

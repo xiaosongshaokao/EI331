@@ -88,6 +88,8 @@ def Img_Outline(original_img):
 def findContours_img(original_img, opened):
     contours, hierarchy = cv2.findContours(opened, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     # 注意这里两个与三个参数的差别是opencv版本的差别，如果报错请更新版本
+    if contours == []:
+        return None
     c = sorted(contours, key=cv2.contourArea, reverse=True)[1]  # 计算最大轮廓的旋转包围盒
     rect = cv2.minAreaRect(c)
     angle = rect[2]
@@ -587,6 +589,8 @@ if __name__ == '__main__':
     img = images[0]
     original_img, opened = Img_Outline(img)
     img = findContours_img(original_img, opened)
+    if img == None:
+        img = images[0]
     # 预处理 得到闭运算后的二值图
     pred_img = pre_process(img)
     # 车牌定位

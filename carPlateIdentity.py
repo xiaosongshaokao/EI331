@@ -3,103 +3,15 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
-from pdb import set_trace
+from PIL import Image
 
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-# 0~9:num, 10~35:letter, 36~66: char
 char_table = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
               'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '川', '鄂', '赣', '甘', '贵',
               '桂', '黑', '沪', '冀', '津', '京', '吉', '辽', '鲁', '蒙', '闽', '宁', '青', '琼', '陕', '苏', '晋',
               '皖', '湘', '新', '豫', '渝', '粤', '云', '藏', '浙']
 
 
-def imshow(str, img):
-    cv2.namedWindow(str, 0)
-    cv2.resizeWindow(str, 640, 480)
-    cv2.imshow(str, img)
-    cv2.waitKey(0)
-
-
-"""
-# 转灰度图 但是没用上？
-def hist_image(img):
-    assert img.ndim == 2
-    hist = [0 for i in range(256)]
-    img_h, img_w = img.shape[0], img.shape[1]
-
-    for row in range(img_h):
-        for col in range(img_w):
-            hist[img[row, col]] += 1
-    p = [hist[n] / (img_w * img_h) for n in range(256)]
-    p1 = np.cumsum(p)
-    for row in range(img_h):
-        for col in range(img_w):
-            v = img[row, col]
-            img[row, col] = p1[v] * 255
-    return img
-
-
-# 也没用上？
-def find_board_area(img):
-    assert img.ndim == 2
-    img_h, img_w = img.shape[0], img.shape[1]
-    top, bottom, left, right = 0, img_h, 0, img_w
-    flag = False
-    h_proj = [0 for i in range(img_h)]
-    v_proj = [0 for i in range(img_w)]
-
-    for row in range(round(img_h * 0.5), round(img_h * 0.8), 3):
-        for col in range(img_w):
-            if img[row, col] == 255:
-                h_proj[row] += 1
-        if flag == False and h_proj[row] > 12:
-            flag = True
-            top = row
-        if flag == True and row > top + 8 and h_proj[row] < 12:
-            bottom = row
-            flag = False
-
-    for col in range(round(img_w * 0.3), img_w, 1):
-        for row in range(top, bottom, 1):
-            if img[row, col] == 255:
-                v_proj[col] += 1
-        if flag == False and (v_proj[col] > 10 or v_proj[col] - v_proj[col - 1] > 5):
-            left = col
-            break
-    return left, top, 120, bottom - top - 10
-"""
-
-
 watch_cascade = cv2.CascadeClassifier('cascade.xml')
-
-
-def Img_Outline(original_img):
-    gray_img = cv2.cvtColor(original_img, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray_img, (9, 9), 0)  # 高斯模糊去噪（设定卷积核大小影响效果）
-    _, RedThresh = cv2.threshold(blurred, 165, 255, cv2.THRESH_BINARY)  # 设定阈值165（阈值影响开闭运算效果）
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # 定义矩形结构元素
-    closed = cv2.morphologyEx(RedThresh, cv2.MORPH_CLOSE, kernel)  # 闭运算（链接块）
-    opened = cv2.morphologyEx(closed, cv2.MORPH_OPEN, kernel)  # 开运算（去噪点）
-    return original_img, opened
-
-
-def findContours_img(original_img, opened):
-    contours, hierarchy = cv2.findContours(opened, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    # 注意这里两个与三个参数的差别是opencv版本的差别，如果报错请更新版本
-    if contours == []:
-        return None
-    c = sorted(contours, key=cv2.contourArea, reverse=True)[1]  # 计算最大轮廓的旋转包围盒
-    rect = cv2.minAreaRect(c)
-    angle = rect[2]
-    print("angle", angle)
-    box = np.int0(cv2.boxPoints(rect))
-    draw_img = cv2.drawContours(original_img.copy(), [box], -1, (0, 0, 255), 3)
-    rows, cols = original_img.shape[:2]
-    M = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-    result_img = cv2.warpAffine(original_img, M, (cols, rows))
-    return result_img
 
 
 def detectPlateRough(image_gray, resize_h=720, en_scale=1.08, top_bottom_padding_rate=0.05):
@@ -127,18 +39,18 @@ def detectPlateRough(image_gray, resize_h=720, en_scale=1.08, top_bottom_padding
         cropped = cropImage(image_color_cropped, (int(x), int(y), int(w), int(h)))
         cropped_images.append(cropped)
         # cropped_images.append([cropped,[x, y+padding, w, h]])
-        # imshow("imageShow", cropped)
+        # cv2.imshow("imageShow", cropped)
         # cv2.waitKey(0)
     return cropped_images
 
 
 def cropImage(image, rect):
-    # imshow("imageShow", image)
+    # cv2.imshow("imageShow", image)
     # cv2.waitKey(0)
     x, y, w, h = computeSafeRegion(image.shape, rect)
-    # imshow("imageShow", image[y:y + h, x:x + w])
-    cv2.waitKey(0)
-    return image[y:y + h, x:x + w]
+    # cv2.imshow("imageShow", image[y:y + h, x:x + w])
+    # cv2.waitKey(0)
+    return image[y-20:y + h+20, x-20:x + w+20]
 
 
 def computeSafeRegion(shape, bounding_rect):
@@ -165,7 +77,52 @@ def computeSafeRegion(shape, bounding_rect):
     return [left, top, right - left, bottom - top]
 
 
-# 根据面积范围、长宽比范围、倾斜角度最大值来判断一个矩形轮廓是否为车牌
+def hist_image(img):
+    assert img.ndim == 2
+    hist = [0 for i in range(256)]
+    img_h, img_w = img.shape[0], img.shape[1]
+
+    for row in range(img_h):
+        for col in range(img_w):
+            hist[img[row, col]] += 1
+    p = [hist[n] / (img_w * img_h) for n in range(256)]
+    p1 = np.cumsum(p)
+    for row in range(img_h):
+        for col in range(img_w):
+            v = img[row, col]
+            img[row, col] = p1[v] * 255
+    return img
+
+
+def find_board_area(img):
+    assert img.ndim == 2
+    img_h, img_w = img.shape[0], img.shape[1]
+    top, bottom, left, right = 0, img_h, 0, img_w
+    flag = False
+    h_proj = [0 for i in range(img_h)]
+    v_proj = [0 for i in range(img_w)]
+
+    for row in range(round(img_h * 0.5), round(img_h * 0.8), 3):
+        for col in range(img_w):
+            if img[row, col] == 255:
+                h_proj[row] += 1
+        if flag == False and h_proj[row] > 12:
+            flag = True
+            top = row
+        if flag == True and row > top + 8 and h_proj[row] < 12:
+            bottom = row
+            flag = False
+
+    for col in range(round(img_w * 0.3), img_w, 1):
+        for row in range(top, bottom, 1):
+            if img[row, col] == 255:
+                v_proj[col] += 1
+        if flag == False and (v_proj[col] > 10 or v_proj[col] - v_proj[col - 1] > 5):
+            left = col
+            break
+    return left, top, 120, bottom - top - 10
+
+
 def verify_scale(rotate_rect):
     error = 0.4
     aspect = 4  # 4.7272
@@ -184,13 +141,12 @@ def verify_scale(rotate_rect):
     area = rotate_rect[1][0] * rotate_rect[1][1]
     if min_area < area < max_area and min_aspect < r < max_aspect:
         # 矩形的倾斜角度在不超过theta
-        if ((rotate_rect[1][0] < rotate_rect[1][1] and -90 <= rotate_rect[2] < -(90 - theta)) or
+        if ((rotate_rect[1][0] < rotate_rect[1][1] and rotate_rect[2] >= -90 and rotate_rect[2] < -(90 - theta)) or
                 (rotate_rect[1][1] < rotate_rect[1][0] and -theta < rotate_rect[2] <= 0)):
             return True
     return False
 
 
-# 位置矫正
 def img_Transform(car_rect, image):
     img_h, img_w = image.shape[:2]
     rect_w, rect_h = car_rect[1][0], car_rect[1][1]
@@ -243,30 +199,34 @@ def img_Transform(car_rect, image):
 
 def pre_process(orig_img):
     gray_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2GRAY)
-    # imshow('gray_img', gray_img)
+    # cv2.imshow('gray_img', gray_img)
+
     blur_img = cv2.blur(gray_img, (3, 3))
-    # imshow('blur', blur_img)
+    # cv2.imshow('blur', blur_img)
+
     sobel_img = cv2.Sobel(blur_img, cv2.CV_16S, 1, 0, ksize=3)
     sobel_img = cv2.convertScaleAbs(sobel_img)
-    # imshow('sobel', sobel_img)
+    cv2.imshow('sobel', sobel_img)
 
-    # 转到hsv空间，筛选黄蓝区域
     hsv_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2HSV)
+
     h, s, v = hsv_img[:, :, 0], hsv_img[:, :, 1], hsv_img[:, :, 2]
     # 黄色色调区间[26，34],蓝色色调区间:[100,124]
-    blue_img = (((h > 26) & (h < 34)) | ((h > 100) & (h < 124))) & (s > 70) & (v > 70)
+    # blue_img = (((h > 26) & (h < 34)) | ((h > 100) & (h < 124))) & (s > 70) & (v > 70)
+    blue_img = ((h > 11) & (h < 155)) & (s > 70) & (v > 70)
     blue_img = blue_img.astype('float32')
+
     mix_img = np.multiply(sobel_img, blue_img)
-    # imshow('mix', mix_img)
+    cv2.imshow('mix', mix_img)
+
     mix_img = mix_img.astype(np.uint8)
 
     ret, binary_img = cv2.threshold(mix_img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    # imshow('binary',binary_img)
+    cv2.imshow('binary', binary_img)
 
-    # 形态学闭运算，消除矩形边缘的小黑洞
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (21, 5))
     close_img = cv2.morphologyEx(binary_img, cv2.MORPH_CLOSE, kernel)
-    # imshow('close', close_img)
+    cv2.imshow('close', close_img)
     return close_img
 
 
@@ -330,8 +290,9 @@ def verify_color(rotate_rect, src_image):
         rand_index = np.random.choice(rand_seed_num, 1, replace=False)
         row, col = points_row[rand_index], points_col[rand_index]
         # 限制随机种子必须是车牌背景色
-        if (((h[row, col] > 26) & (h[row, col] < 34)) | ((h[row, col] > 100) & (h[row, col] < 124))) & (
-                s[row, col] > 70) & (v[row, col] > 70):
+        # if (((h[row, col] > 26) & (h[row, col] < 34)) | ((h[row, col] > 100) & (h[row, col] < 124))) & (
+        #         s[row, col] > 70) & (v[row, col] > 70):
+        if (h[row, col] > 11 & h[row, col] < 155) & (s[row, col] > 70) & (v[row, col] > 70):
             cv2.floodFill(src_image, mask, (col, row), (255, 255, 255), (loDiff,) * 3, (upDiff,) * 3, flags)
             cv2.circle(flood_img, center=(col, row), radius=2, color=(0, 0, 255), thickness=2)
             seed_cnt += 1
@@ -339,8 +300,8 @@ def verify_color(rotate_rect, src_image):
                 break
     # ======================调试用======================#
     show_seed = np.random.uniform(1, 100, 1).astype(np.uint16)
-    # imshow('flood fill' + str(show_seed), flood_img)
-    # imshow('flood mask' + str(show_seed), mask)
+    cv2.imshow('floodfill' + str(show_seed), flood_img)
+    cv2.imshow('flood_mask' + str(show_seed), mask)
     # ======================调试用======================#
     # 获取掩模上被填充点的像素点，并求点集的最小外接矩形
     mask_points = []
@@ -360,8 +321,7 @@ def locate_carPlate(orig_img, pred_image):
     carPlate_list = []
     temp1_orig_img = orig_img.copy()  # 调试用
     temp2_orig_img = orig_img.copy()  # 调试用
-    # 查找轮廓
-    contours, hierarchy = cv2.findContours(pred_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, heriachy = cv2.findContours(pred_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for i, contour in enumerate(contours):
         cv2.drawContours(temp1_orig_img, contours, i, (0, 255, 255), 2)
         # 获取轮廓最小外接矩形，返回值rotate_rect
@@ -379,11 +339,11 @@ def locate_carPlate(orig_img, pred_image):
             for k in range(4):
                 n1, n2 = k % 4, (k + 1) % 4
                 cv2.line(temp1_orig_img, (box[n1][0], box[n1][1]), (box[n2][0], box[n2][1]), (255, 0, 0), 2)
-            # imshow('opencv_' + str(i), car_plate)
+            cv2.imshow('opencv_' + str(i), car_plate)
             # ========================调试看效果========================#
             carPlate_list.append(car_plate)
 
-    # imshow('contour', temp1_orig_img)
+    cv2.imshow('contour', temp1_orig_img)
     return carPlate_list
 
 
@@ -398,21 +358,23 @@ def horizontal_cut_chars(plate):
         sum = 0
         for i in range(img.shape[0]):
             sum += round(img[i, col] / 255)
-        return sum;
+        return sum
 
     sum = 0
     for col in range(img_w):
         sum += getColSum(plate, col)
     # 每列边缘像素点必须超过均值的60%才能判断属于字符区域
-    col_limit = 0  # round(0.5*sum/img_w)
+    # col_limit = 0  # round(0.5*sum/img_w)
+    col_limit = round(0.6*sum/img_w)
     # 每个字符宽度也进行限制
-    charWid_limit = [round(img_w / 12), round(img_w / 5)]
+    # charWid_limit = [round(img_w / 12), round(img_w / 5)]
+    charWid_limit = [round(img_w / 15), round(img_w / 5)]
     is_char_flag = False
 
     for i in range(img_w):
         colValue = getColSum(plate, i)
         if colValue > col_limit:
-            if not is_char_flag:
+            if is_char_flag == False:
                 area_right = round((i + char_right) / 2)
                 area_width = area_right - area_left
                 char_width = char_right - char_left
@@ -422,7 +384,7 @@ def horizontal_cut_chars(plate):
                 area_left = round((char_left + char_right) / 2)
                 is_char_flag = True
         else:
-            if is_char_flag:
+            if is_char_flag == True:
                 char_right = i - 1
                 is_char_flag = False
     # 手动结束最后未完成的字符分割
@@ -490,14 +452,18 @@ def get_chars(car_plate):
 
     for i, addr in enumerate(char_addr_list):
         char_img = car_plate[chars_top:chars_bottom + 1, addr[0]:addr[1]]
+        cv2.imshow("char" + str(i), char_img)
         char_img = cv2.resize(char_img, (char_w, char_h))
+        cv2.imshow("chars" + str(i), char_img)
         char_imgs.append(char_img)
     return char_imgs
 
 
 def extract_char(car_plate):
+    cv2.imshow("car", car_plate)
     gray_plate = cv2.cvtColor(car_plate, cv2.COLOR_BGR2GRAY)
     ret, binary_plate = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    cv2.imshow("plate", binary_plate)
     char_img_list = get_chars(binary_plate)
     return char_img_list
 
@@ -533,13 +499,12 @@ def cnn_select_carPlate(plate_list, model_path):
                 return True, plate_list[result_index]
 
 
-def cnn_recognize_char(img_list, model_path, cls = 0):
+def cnn_recongnize_char(img_list, model_path):
     g2 = tf.Graph()
     sess2 = tf.Session(graph=g2)
     text_list = []
-    char_nums = len(img_list)
 
-    if char_nums == 0:
+    if len(img_list) == 0:
         return text_list
     with sess2.as_default():
         with sess2.graph.as_default():
@@ -552,20 +517,13 @@ def cnn_recognize_char(img_list, model_path, cls = 0):
             net2_out = graph.get_tensor_by_name('out_put:0')
 
             data = np.array(img_list)
+            # 数字、字母、汉字，从67维向量找到概率最大的作为预测结果
             net_out = tf.nn.softmax(net2_out)
-            probs = sess2.run(net_out, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
-            preds = tf.argmax(net_out,1)
+            preds = tf.argmax(net_out, 1)
             my_preds = sess2.run(preds, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
 
             for i in my_preds:
-                if not cls or cls == 3:
-                    text_list.append(char_table[i])
-                elif cls == 2:
-                    text_list.append(char_table[i+10])
-                elif cls == 1:
-                    text_list.append(char_table[i+36])
-                else:
-                    text_list = ["错误标记"]
+                text_list.append(char_table[i])
             return text_list
 
 
@@ -573,44 +531,36 @@ if __name__ == '__main__':
     cur_dir = sys.path[0]
     car_plate_w, car_plate_h = 136, 36
     char_w, char_h = 20, 20
-    # 加载训练资源
-    plate_model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recognize\model.ckpt-510.meta')
-    char_model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize\model.ckpt-510.meta')
-    char_model_path_chinese = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize\model.ckpt-620.meta')
-    char_model_path_letter = os.path.join(cur_dir, r'carIdentityData\model\letter_recognize\model.ckpt-520.meta')
-    char_model_path_nletter = os.path.join(cur_dir, r'carIdentityData\model\numAndLetter_recognize\model.ckpt-510.meta')
-
-    img = cv2.imread('./carIdentityData/images/21.jpg')
-    # a = img.shape
-    # img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
-    # imshow('a', img)
-    # cv2.waitKey(0)
-    images = detectPlateRough(img, img.shape[0], top_bottom_padding_rate=0.1)
+    plate_model_path = os.path.join(cur_dir, 'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
+    # plate_model_path = tf.train.latest_checkpoint(plate_model_path)
+    # plate_model_path = os.path.join(plate_model_path,".meta")
+    char_model_path = os.path.join(cur_dir, 'carIdentityData\model\char_recongnize\model.ckpt-550.meta')
+    # char_model_path = tf.train.latest_checkpoint(char_model_path)
+    # char_model_path = os.path.join(char_model_path,".meta")
+    image = cv2.imread('./images/17.jpg')
+    images = detectPlateRough(image, image.shape[0], top_bottom_padding_rate=0.1)
     img = images[0]
-    original_img, opened = Img_Outline(img)
-    img = findContours_img(original_img, opened)
-    if img == None:
-        img = images[0]
-    # 预处理 得到闭运算后的二值图
+    a = img.shape
+    img = cv2.resize(img, (180, int(180*a[0]/a[1])))
+    cv2.imshow('1', img)
+    # img = cv2.imread('./images/24.jpg')
+    # 预处理
     pred_img = pre_process(img)
     # 车牌定位
     car_plate_list = locate_carPlate(img, pred_img)
+
     # CNN车牌过滤
     ret, car_plate = cnn_select_carPlate(car_plate_list, plate_model_path)
     if not ret:
         print("未检测到车牌")
         sys.exit(-1)
-    # imshow('cnn_plate', car_plate)
+    cv2.imshow('cnn_plate', car_plate)
+
     # 字符提取
     char_img_list = extract_char(car_plate)
-    print("识别出%s个字符" % len(char_img_list))
+
     # CNN字符识别
-    if len(char_img_list) != 7:
-        text = cnn_recognize_char(char_img_list, char_model_path)
-    else:
-        text = cnn_recognize_char(char_img_list[:1], char_model_path_chinese, 1)
-        text += cnn_recognize_char(char_img_list[1:2], char_model_path_letter, 2)
-        text += cnn_recognize_char(char_img_list[2:], char_model_path_nletter, 3)
+    text = cnn_recongnize_char(char_img_list, char_model_path)
     print(text)
 
     cv2.waitKey(0)

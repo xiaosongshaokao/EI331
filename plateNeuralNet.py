@@ -174,7 +174,7 @@ if __name__ == '__main__':
     train_model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recognize\model.ckpt')
     model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recognize')
 
-    train_flag = 1
+    train_flag = 0
     net = plate_cnn_net()
 
     if train_flag == 1:

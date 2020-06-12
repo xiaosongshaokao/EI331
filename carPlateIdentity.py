@@ -3,7 +3,7 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
-from PIL import Image
+import matplotlib.pyplot as plt
 
 char_table = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
               'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '川', '鄂', '赣', '甘', '贵',
@@ -531,13 +531,13 @@ if __name__ == '__main__':
     cur_dir = sys.path[0]
     car_plate_w, car_plate_h = 136, 36
     char_w, char_h = 20, 20
-    plate_model_path = os.path.join(cur_dir, 'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
+    plate_model_path = os.path.join(cur_dir, 'carIdentityData\model\plate_recognize\model.ckpt-510.meta')
     # plate_model_path = tf.train.latest_checkpoint(plate_model_path)
     # plate_model_path = os.path.join(plate_model_path,".meta")
-    char_model_path = os.path.join(cur_dir, 'carIdentityData\model\char_recongnize\model.ckpt-550.meta')
+    char_model_path = os.path.join(cur_dir, 'carIdentityData\model\char_recognize\model.ckpt-640.meta')
     # char_model_path = tf.train.latest_checkpoint(char_model_path)
     # char_model_path = os.path.join(char_model_path,".meta")
-    image = cv2.imread('./images/17.jpg')
+    image = cv2.imread('./images/20.jpg')
     images = detectPlateRough(image, image.shape[0], top_bottom_padding_rate=0.1)
     img = images[0]
     a = img.shape
@@ -546,7 +546,7 @@ if __name__ == '__main__':
     # img = cv2.imread('./images/24.jpg')
     # 预处理
     pred_img = pre_process(img)
-    # 车牌定位
+    #车牌定位
     car_plate_list = locate_carPlate(img, pred_img)
 
     # CNN车牌过滤

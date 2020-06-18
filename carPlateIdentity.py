@@ -492,7 +492,7 @@ def extract_char(car_plate):
     gray_plate = cv2.cvtColor(car_plate, cv2.COLOR_BGR2GRAY)
     # ret, binary_plate = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
     threshold, _ = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    _, binary_plate = cv2.threshold(gray_plate, threshold + 0, 255, cv2.THRESH_BINARY)
+    _, binary_plate = cv2.threshold(gray_plate, threshold + 23, 255, cv2.THRESH_BINARY)
     # imshow("plate", binary_plate)
     char_img_list = get_chars(binary_plate)
     return char_img_list

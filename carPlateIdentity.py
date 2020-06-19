@@ -493,7 +493,7 @@ def extract_char(car_plate):
     # ret, binary_plate = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
     threshold, _ = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
     _, binary_plate = cv2.threshold(gray_plate, threshold + 23, 255, cv2.THRESH_BINARY)
-    # imshow("plate", binary_plate)
+    #imshow("plate", binary_plate)
     char_img_list = get_chars(binary_plate)
     return char_img_list
 
@@ -565,16 +565,66 @@ def cnn_recognize_char(img_list, model_path, cls = 0):
             return text_list
 
 
+cur_dir = sys.path[0]
+car_plate_w, car_plate_h = 136, 36
+char_w, char_h = 20, 20
+# 加载训练资源
+plate_model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
+char_model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize\model.ckpt-560.meta')
+char_model_path_chinese = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize\model.ckpt-640.meta')
+char_model_path_letter = os.path.join(cur_dir, r'carIdentityData\model\letter_recognize\model.ckpt-510.meta')
+char_model_path_nletter = os.path.join(cur_dir, r'carIdentityData\model\numAndLetter_recognize\model.ckpt-510.meta')
+
+def imreadex(filename):
+    return cv2.imread(filename)
+
+def recognize(img):
+    a = img.shape
+    img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
+    # imshow('a', img)
+
+    #####  这个地方报错太多，暂时没用  ######
+    # images = detectPlateRough(img, img.shape[0], top_bottom_padding_rate=0.1)
+    # img = images[0]
+    # original_img, opened = Img_Outline(img)
+    # img = findContours_img(original_img, opened)
+
+    # 预处理 得到闭运算后的二值图
+    pred_img = pre_process(img)
+    # 车牌定位
+    car_plate_list = locate_carPlate(img, pred_img)
+    # CNN车牌过滤
+    ret, car_plate = cnn_select_carPlate(car_plate_list, plate_model_path)
+    if not ret:
+        print("未检测到车牌")
+        sys.exit(-1)
+    # imshow('cnn_plate', car_plate)
+    # 字符提取
+    char_img_list = extract_char(car_plate)
+    print("识别出%s个字符" % len(char_img_list))
+    # CNN字符识别
+    if len(char_img_list) != 7:
+        text = cnn_recognize_char(char_img_list, char_model_path)
+    else:
+        text = cnn_recognize_char(char_img_list[:1], char_model_path_chinese, 1)
+        text += cnn_recognize_char(char_img_list[1:2], char_model_path_letter, 2)
+        text += [" "]
+        text += cnn_recognize_char(char_img_list[2:], char_model_path_nletter, 3)
+    print("".join(text))
+    cvt_carplate = cv2.cvtColor(car_plate, cv2.COLOR_BGR2RGB)
+    return "".join(text),cvt_carplate
+
+
 if __name__ == '__main__':
     cur_dir = sys.path[0]
     car_plate_w, car_plate_h = 136, 36
     char_w, char_h = 20, 20
     # 加载训练资源
-    plate_model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recognize\model.ckpt-510.meta')
-    char_model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize\model.ckpt-530.meta')
-    char_model_path_chinese = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize\model.ckpt-2140.meta')
-    char_model_path_letter = os.path.join(cur_dir, r'carIdentityData\model\letter_recognize\model.ckpt-530.meta')
-    char_model_path_nletter = os.path.join(cur_dir, r'carIdentityData\model\numAndLetter_recognize\model.ckpt-520.meta')
+    plate_model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
+    char_model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize\model.ckpt-560.meta')
+    char_model_path_chinese = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize\model.ckpt-640.meta')
+    char_model_path_letter = os.path.join(cur_dir, r'carIdentityData\model\letter_recognize\model.ckpt-510.meta')
+    char_model_path_nletter = os.path.join(cur_dir, r'carIdentityData\model\numAndLetter_recognize\model.ckpt-510.meta')
 
     img = cv2.imread('./carIdentityData/images/2.jpg')
     a = img.shape
@@ -609,5 +659,4 @@ if __name__ == '__main__':
         text += [" "]
         text += cnn_recognize_char(char_img_list[2:], char_model_path_nletter, 3)
     print("".join(text))
-
     cv2.waitKey(0)

@@ -95,7 +95,7 @@ class Surface(ttk.Frame):
             img_bgr = try2.imreadex(self.pic_path)  #调用车牌检测函数
             self.imgtk = self.get_imgtk(img_bgr)    # 读取和预处理图片
             self.image_ctl.configure(image=self.imgtk)      # 配置窗口控件（Widgets）
-            text,car_plate=try2.recognize(img_bgr)     # 识别图像中的车牌信息
+            text,car_plate=carPlateIdentity.recognize(img_bgr)     # 识别图像中的车牌信息
             self.show_roi(text, car_plate)    # 在窗口显示识别的车牌信息
 
     @staticmethod

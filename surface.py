@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter.filedialog import *
 from tkinter import ttk
-import try2
+import carPlateIdentity
 import cv2
 from PIL import Image, ImageTk
 import threading
@@ -92,7 +92,7 @@ class Surface(ttk.Frame):
         self.thread_run = False
         self.pic_path = askopenfilename(title="选择识别图片", filetypes=[("jpg图片", "*.jpg")])
         if self.pic_path:
-            img_bgr = try2.imreadex(self.pic_path)  #调用车牌检测函数
+            img_bgr = carPlateIdentity.imreadex(self.pic_path)  #调用车牌检测函数
             self.imgtk = self.get_imgtk(img_bgr)    # 读取和预处理图片
             self.image_ctl.configure(image=self.imgtk)      # 配置窗口控件（Widgets）
             text,car_plate=carPlateIdentity.recognize(img_bgr)     # 识别图像中的车牌信息

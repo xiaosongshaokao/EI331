@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import tensorflow as tf
 from frozen import app_path as base_dir
-
+import locating
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # 0~9:num, 10~35:letter, 36~66: char
@@ -547,7 +547,7 @@ def recognize_plate_in_img(address):
     ret, car_plate = cnn_select_carPlate(car_plate_list, plate_model_path)
     if not ret:
         print("未检测到车牌")
-        sys.exit(-1)
+        return '',car_plate
     imshow('cnn_plate', car_plate)
     # 字符提取
     char_img_list = extract_char(car_plate)
@@ -561,19 +561,20 @@ def recognize_plate_in_img(address):
         text += ["·"]
         text += cnn_recognize_char(char_img_list[2:], char_model_path_nletter, 3)
     print(address, "".join(text))
+    cvt_car_plate=cv2.cvtColor(car_plate, cv2.COLOR_BGR2RGB)
+    return "".join(text),cvt_car_plate
+  
+cur_dir = sys.path[0]
+car_plate_w, car_plate_h = 136, 36
+char_w, char_h = 20, 20
+plate_model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
+char_model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize\model.ckpt-560.meta')
+char_model_path_chinese = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize\model.ckpt-640.meta')
+char_model_path_letter = os.path.join(cur_dir, r'carIdentityData\model\letter_recognize\model.ckpt-510.meta')
+char_model_path_nletter = os.path.join(cur_dir, r'carIdentityData\model\numAndLetter_recognize\model.ckpt-510.meta')
 
 
 if __name__ == '__main__':
-    # cur_dir = sys.path[0]
-    cur_dir = base_dir()
-    car_plate_w, car_plate_h = 136, 36
-    char_w, char_h = 20, 20
-    # 加载训练资源
-    plate_model_path = os.path.join(cur_dir, r'data\model\plate_recognize\model.ckpt-510.meta')
-    char_model_path = os.path.join(cur_dir, r'data\model\char_recognize\model.ckpt-530.meta')
-    char_model_path_chinese = os.path.join(cur_dir, r'data\model\chinese_recognize\model.ckpt-2140.meta')
-    char_model_path_letter = os.path.join(cur_dir, r'data\model\letter_recognize\model.ckpt-530.meta')
-    char_model_path_nletter = os.path.join(cur_dir, r'data\model\numAndLetter_recognize\model.ckpt-520.meta')
 
     # for i in range(1, 10):
     #     # while 1:

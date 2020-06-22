@@ -3,7 +3,8 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
+from frozen import app_path as base_dir
+import locating
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # 0~9:num, 10~35:letter, 36~66: char
@@ -15,61 +16,11 @@ char_table = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', '
 
 def imshow(str, img):
     cv2.namedWindow(str, 0)
-    h, w = np.shape(img)
+    h, w = np.shape(img)[0:2]
     h *= int(640 / w)
     cv2.resizeWindow(str, 640, h)
     cv2.imshow(str, img)
     cv2.waitKey(0)
-
-
-"""
-# 转灰度图 但是没用上？
-def hist_image(img):
-    assert img.ndim == 2
-    hist = [0 for i in range(256)]
-    img_h, img_w = img.shape[0], img.shape[1]
-
-    for row in range(img_h):
-        for col in range(img_w):
-            hist[img[row, col]] += 1
-    p = [hist[n] / (img_w * img_h) for n in range(256)]
-    p1 = np.cumsum(p)
-    for row in range(img_h):
-        for col in range(img_w):
-            v = img[row, col]
-            img[row, col] = p1[v] * 255
-    return img
-
-
-# 也没用上？
-def find_board_area(img):
-    assert img.ndim == 2
-    img_h, img_w = img.shape[0], img.shape[1]
-    top, bottom, left, right = 0, img_h, 0, img_w
-    flag = False
-    h_proj = [0 for i in range(img_h)]
-    v_proj = [0 for i in range(img_w)]
-
-    for row in range(round(img_h * 0.5), round(img_h * 0.8), 3):
-        for col in range(img_w):
-            if img[row, col] == 255:
-                h_proj[row] += 1
-        if flag == False and h_proj[row] > 12:
-            flag = True
-            top = row
-        if flag == True and row > top + 8 and h_proj[row] < 12:
-            bottom = row
-            flag = False
-
-    for col in range(round(img_w * 0.3), img_w, 1):
-        for row in range(top, bottom, 1):
-            if img[row, col] == 255:
-                v_proj[col] += 1
-        if flag == False and (v_proj[col] > 10 or v_proj[col] - v_proj[col - 1] > 5):
-            left = col
-            break
-    return left, top, 120, bottom - top - 10
-"""
 
 
 watch_cascade = cv2.CascadeClassifier('cascade.xml')
@@ -384,24 +335,31 @@ def locate_carPlate(orig_img, pred_image):
     return carPlate_list
 
 
+# 获取车牌每列边缘像素点个数
+def getColSum(img, col):
+    cnt = 0
+    for i in range(img.shape[0]):
+        cnt += round(img[i, col] / 255)
+    return cnt
+
+
+def max_col_weight(img):
+    max_wt = 0
+    for col in range(img.shape[1]):
+        max_wt = max(max_wt, getColSum(img, col))
+    return max_wt
+
+
 # 左右切割
 def horizontal_cut_chars(plate):
     char_addr_list = []
     area_left, area_right, char_left, char_right = 0, 0, 0, 0
     img_w = plate.shape[1]
-
-    # 获取车牌每列边缘像素点个数
-    def getColSum(img, col):
-        cnt = 0
-        for i in range(img.shape[0]):
-            cnt += round(img[i, col] / 255)
-        return cnt
-
-    sum = 0
+    total_weight = 0
     for col in range(img_w):
-        sum += getColSum(plate, col)
+        total_weight += getColSum(plate, col)
     # 列占比和行宽限制
-    col_limit = round(0.25 * sum / img_w)
+    col_limit = round(0.25 * total_weight / img_w)
     char_width_limit = [round(img_w / 15), round(img_w / 5)]
     is_char_flag = False
 
@@ -413,7 +371,7 @@ def horizontal_cut_chars(plate):
                 area_width = area_right - area_left
                 char_width = char_right - char_left
                 if char_width_limit[0] < area_width < char_width_limit[1]:
-                    char_addr_list.append((area_left, area_right, char_width))
+                    char_addr_list.append((area_left, area_right+2, char_width))
                 char_left = i
                 area_left = round((char_left + char_right) / 2)
                 is_char_flag = True
@@ -474,26 +432,31 @@ def get_chars(car_plate):
         if h_maxHeight < (end - start):
             h_maxHeight = (end - start)
             h_maxIndex = i
-    if h_maxHeight / img_h < 0.5:
-        return char_imgs
-
+    # if h_maxHeight / img_h < 0.5:
+    #     print("字符高度过低")
+    #     return char_imgs
     chars_top, chars_bottom = h_proj_list[h_maxIndex]
     plates = car_plate[chars_top:chars_bottom + 1, :]
-    # imshow("纵向规约", plates)
+    imshow("vertical-subtract", plates)
     char_addr_list = horizontal_cut_chars(plates)
     for i, addr in enumerate(char_addr_list):
-        char_img = plates[:, addr[0]:addr[1]]
+        char_img = car_plate[chars_top:chars_bottom+1, addr[0]:addr[1]]      # chars_top:chars_bottom+1改成固定值
         char_img = cv2.resize(char_img, (char_w, char_h))
+        m_wt = max_col_weight(char_img)
+        if m_wt < char_h / 3:                       # 对最大高度进行筛选
+            continue
         char_imgs.append(char_img)
+    imshow("chars", np.concatenate(tuple(char_imgs), axis=1))
     return char_imgs
 
 
 def extract_char(car_plate):
     gray_plate = cv2.cvtColor(car_plate, cv2.COLOR_BGR2GRAY)
-    # ret, binary_plate = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    threshold, _ = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    _, binary_plate = cv2.threshold(gray_plate, threshold + 23, 255, cv2.THRESH_BINARY)
-    #imshow("plate", binary_plate)
+    ret, binary_plate = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # threshold, _ = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # _, binary_plate = cv2.threshold(gray_plate, threshold + 15, 255, cv2.THRESH_BINARY)
+    # print(threshold)
+    # imshow("plate", binary_plate)
     char_img_list = get_chars(binary_plate)
     return char_img_list
 
@@ -549,8 +512,7 @@ def cnn_recognize_char(img_list, model_path, cls = 0):
 
             data = np.array(img_list)
             net_out = tf.nn.softmax(net2_out)
-            probs = sess2.run(net_out, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
-            preds = tf.argmax(net_out,1)
+            preds = tf.argmax(net_out, 1)
             my_preds = sess2.run(preds, feed_dict={net2_x_place: data, net2_keep_place: 1.0})
 
             for i in my_preds:
@@ -565,98 +527,61 @@ def cnn_recognize_char(img_list, model_path, cls = 0):
             return text_list
 
 
+def recognize_plate_in_img(address):
+    img = cv2.imread(address)
+    a = img.shape
+    img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
+    # imshow('a', img)
+
+    #####  这个地方报错太多，暂时没用  ######
+    # images = detectPlateRough(img, img.shape[0], top_bottom_padding_rate=0.1)
+    # img = images[0]
+    # original_img, opened = Img_Outline(img)
+    # img = findContours_img(original_img, opened)
+
+    # 预处理 得到闭运算后的二值图
+    pred_img = pre_process(img)
+    # 车牌定位
+    car_plate_list = locate_carPlate(img, pred_img)
+    # CNN车牌过滤
+    ret, car_plate = cnn_select_carPlate(car_plate_list, plate_model_path)
+    if not ret:
+        print("未检测到车牌")
+        return '',car_plate
+    imshow('cnn_plate', car_plate)
+    # 字符提取
+    char_img_list = extract_char(car_plate)
+    print("识别出%s个字符" % len(char_img_list))
+    # CNN字符识别
+    if len(char_img_list) != 7:
+        text = cnn_recognize_char(char_img_list, char_model_path)
+    else:
+        text = cnn_recognize_char(char_img_list[:1], char_model_path_chinese, 1)
+        text += cnn_recognize_char(char_img_list[1:2], char_model_path_letter, 2)
+        text += ["·"]
+        text += cnn_recognize_char(char_img_list[2:], char_model_path_nletter, 3)
+    print(address, "".join(text))
+    cvt_car_plate=cv2.cvtColor(car_plate, cv2.COLOR_BGR2RGB)
+    return "".join(text),cvt_car_plate
+  
 cur_dir = sys.path[0]
 car_plate_w, car_plate_h = 136, 36
 char_w, char_h = 20, 20
-# 加载训练资源
 plate_model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
 char_model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize\model.ckpt-560.meta')
 char_model_path_chinese = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize\model.ckpt-640.meta')
 char_model_path_letter = os.path.join(cur_dir, r'carIdentityData\model\letter_recognize\model.ckpt-510.meta')
 char_model_path_nletter = os.path.join(cur_dir, r'carIdentityData\model\numAndLetter_recognize\model.ckpt-510.meta')
 
-def imreadex(filename):
-    return cv2.imread(filename)
-
-def recognize(img):
-    a = img.shape
-    img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
-    # imshow('a', img)
-
-    #####  这个地方报错太多，暂时没用  ######
-    # images = detectPlateRough(img, img.shape[0], top_bottom_padding_rate=0.1)
-    # img = images[0]
-    # original_img, opened = Img_Outline(img)
-    # img = findContours_img(original_img, opened)
-
-    # 预处理 得到闭运算后的二值图
-    pred_img = pre_process(img)
-    # 车牌定位
-    car_plate_list = locate_carPlate(img, pred_img)
-    # CNN车牌过滤
-    ret, car_plate = cnn_select_carPlate(car_plate_list, plate_model_path)
-    if not ret:
-        print("未检测到车牌")
-        sys.exit(-1)
-    # imshow('cnn_plate', car_plate)
-    # 字符提取
-    char_img_list = extract_char(car_plate)
-    print("识别出%s个字符" % len(char_img_list))
-    # CNN字符识别
-    if len(char_img_list) != 7:
-        text = cnn_recognize_char(char_img_list, char_model_path)
-    else:
-        text = cnn_recognize_char(char_img_list[:1], char_model_path_chinese, 1)
-        text += cnn_recognize_char(char_img_list[1:2], char_model_path_letter, 2)
-        text += [" "]
-        text += cnn_recognize_char(char_img_list[2:], char_model_path_nletter, 3)
-    print("".join(text))
-    cvt_carplate = cv2.cvtColor(car_plate, cv2.COLOR_BGR2RGB)
-    return "".join(text),cvt_carplate
-
 
 if __name__ == '__main__':
-    cur_dir = sys.path[0]
-    car_plate_w, car_plate_h = 136, 36
-    char_w, char_h = 20, 20
-    # 加载训练资源
-    plate_model_path = os.path.join(cur_dir, r'carIdentityData\model\plate_recongnize\model.ckpt-510.meta')
-    char_model_path = os.path.join(cur_dir, r'carIdentityData\model\char_recognize\model.ckpt-560.meta')
-    char_model_path_chinese = os.path.join(cur_dir, r'carIdentityData\model\chinese_recognize\model.ckpt-640.meta')
-    char_model_path_letter = os.path.join(cur_dir, r'carIdentityData\model\letter_recognize\model.ckpt-510.meta')
-    char_model_path_nletter = os.path.join(cur_dir, r'carIdentityData\model\numAndLetter_recognize\model.ckpt-510.meta')
 
-    img = cv2.imread('./carIdentityData/images/2.jpg')
-    a = img.shape
-    img = cv2.resize(img, (600, int(600 * a[0] / a[1])))
-    # imshow('a', img)
-
-    #####  这个地方报错太多，暂时没用  ######
-    # images = detectPlateRough(img, img.shape[0], top_bottom_padding_rate=0.1)
-    # img = images[0]
-    # original_img, opened = Img_Outline(img)
-    # img = findContours_img(original_img, opened)
-
-    # 预处理 得到闭运算后的二值图
-    pred_img = pre_process(img)
-    # 车牌定位
-    car_plate_list = locate_carPlate(img, pred_img)
-    # CNN车牌过滤
-    ret, car_plate = cnn_select_carPlate(car_plate_list, plate_model_path)
-    if not ret:
-        print("未检测到车牌")
-        sys.exit(-1)
-    # imshow('cnn_plate', car_plate)
-    # 字符提取
-    char_img_list = extract_char(car_plate)
-    print("识别出%s个字符" % len(char_img_list))
-    # CNN字符识别
-    if len(char_img_list) != 7:
-        text = cnn_recognize_char(char_img_list, char_model_path)
-    else:
-        text = cnn_recognize_char(char_img_list[:1], char_model_path_chinese, 1)
-        text += cnn_recognize_char(char_img_list[1:2], char_model_path_letter, 2)
-        text += [" "]
-        text += cnn_recognize_char(char_img_list[2:], char_model_path_nletter, 3)
-    print("".join(text))
-    cv2.waitKey(0)
+    # for i in range(1, 10):
+    #     # while 1:
+    #     try:
+    #         recognize_plate_in_img(os.path.join(cur_dir, 'data/test/%s.jpg' % i)
+    #         # break
+    #     except:
+    #         pass
+    recognize_plate_in_img(os.path.join(cur_dir, 'data/test/%s.jpg' % "008"))
+    os.system("pause")

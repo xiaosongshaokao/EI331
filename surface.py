@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter.filedialog import *
 from tkinter import ttk
-import try2
+import carPlateIdentity
 import cv2
 from PIL import Image, ImageTk
 import threading
@@ -82,20 +82,21 @@ class Surface(ttk.Frame):
             self.roi_ctl.configure(image=self.imgtk_roi, state='enable')
             self.r_ctl.configure(text=str(r))   # 分字符显示车牌号
             self.update_time = time.time()
-        elif self.update_time + 8 < time.time():    # 如果未识别出车牌则不显示该部分
-            self.roi_ctl.configure(state='disabled')
-            self.r_ctl.configure(text="")
+        else:    # 如果未识别出车牌则不显示该部分
+            self.roi_ctl.configure(image='')
+            self.r_ctl.configure(text="未识别出车牌")
 
-
+    def imreadex(self,filename):
+        return cv2.imread(filename)
 
     def from_pic(self):     # 从图片识别车牌
         self.thread_run = False
         self.pic_path = askopenfilename(title="选择识别图片", filetypes=[("jpg图片", "*.jpg")])
         if self.pic_path:
-            img_bgr = try2.imreadex(self.pic_path)  #调用车牌检测函数
+            img_bgr = self.imreadex(self.pic_path)  #调用车牌检测函数
             self.imgtk = self.get_imgtk(img_bgr)    # 读取和预处理图片
             self.image_ctl.configure(image=self.imgtk)      # 配置窗口控件（Widgets）
-            text,car_plate=carPlateIdentity.recognize(img_bgr)     # 识别图像中的车牌信息
+            text,car_plate=carPlateIdentity.recognize_plate_in_img(self.pic_path)     # 识别图像中的车牌信息
             self.show_roi(text, car_plate)    # 在窗口显示识别的车牌信息
 
     @staticmethod

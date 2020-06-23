@@ -202,7 +202,8 @@ def pre_process(orig_img):
     hsv_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2HSV)
     h, s, v = hsv_img[:, :, 0], hsv_img[:, :, 1], hsv_img[:, :, 2]
     # 黄色色调区间[26，34],蓝色色调区间:[100,124]
-    blue_img = (((h > 26) & (h < 34)) | ((h > 100) & (h < 124))) & (s > 70) & (v > 70)
+    # blue_img = (((h > 26) & (h < 34)) | ((h > 100) & (h < 124))) & (s > 70) & (v > 70)
+    blue_img = ((h > 11) & (h < 155)) & (s > 70) & (v > 70) #扩大区间防止因颜色模糊导致的车牌框定不全
     blue_img = blue_img.astype('float32')
     mix_img = np.multiply(sobel_img, blue_img)
     # imshow('mix', mix_img)
@@ -278,8 +279,9 @@ def verify_color(rotate_rect, src_image):
         rand_index = np.random.choice(rand_seed_num, 1, replace=False)
         row, col = points_row[rand_index], points_col[rand_index]
         # 限制随机种子必须是车牌背景色
-        if (((h[row, col] > 26) & (h[row, col] < 34)) | ((h[row, col] > 100) & (h[row, col] < 124))) & (
-                s[row, col] > 70) & (v[row, col] > 70):
+#         if (((h[row, col] > 26) & (h[row, col] < 34)) | ((h[row, col] > 100) & (h[row, col] < 124))) & (
+#                 s[row, col] > 70) & (v[row, col] > 70):
+          if (h[row, col] > 11 & h[row, col] < 155) & (s[row, col] > 70) & (v[row, col] > 70): #扩大颜色区间
             cv2.floodFill(src_image, mask, (col, row), (255, 255, 255), (loDiff,) * 3, (upDiff,) * 3, flags)
             cv2.circle(flood_img, center=(col, row), radius=2, color=(0, 0, 255), thickness=2)
             seed_cnt += 1
@@ -351,7 +353,7 @@ def max_col_weight(img):
 
 
 # 左右切割
-def horizontal_cut_chars(plate):
+def horizontal_cut_chars(plate, limit):
     char_addr_list = []
     area_left, area_right, char_left, char_right = 0, 0, 0, 0
     img_w = plate.shape[1]
@@ -359,7 +361,7 @@ def horizontal_cut_chars(plate):
     for col in range(img_w):
         total_weight += getColSum(plate, col)
     # 列占比和行宽限制
-    col_limit = round(0.25 * total_weight / img_w)
+    col_limit = round(0.1 * limit * total_weight / img_w)
     char_width_limit = [round(img_w / 15), round(img_w / 5)]
     is_char_flag = False
 
@@ -394,7 +396,7 @@ def get_chars(car_plate):
     h_proj_list = []  # 水平投影长度列表
     h_temp_len, v_temp_len = 0, 0
     h_startIndex, h_end_index = 0, 0  # 水平投影记索引
-    h_proj_limit = [0.2, 0.8]  # 车牌在水平方向得轮廓长度少于20%或多余80%过滤掉
+    h_proj_limit = [0.05, 0.8]  # 车牌在水平方向得轮廓长度少于20%或多余80%过滤掉
     char_imgs = []
     # 将二值化的车牌水平投影到Y轴，计算投影后的连续长度，连续投影长度可能不止一段
     h_count = [0 for i in range(img_h)]
@@ -438,7 +440,15 @@ def get_chars(car_plate):
     chars_top, chars_bottom = h_proj_list[h_maxIndex]
     plates = car_plate[chars_top:chars_bottom + 1, :]
     imshow("vertical-subtract", plates)
-    char_addr_list = horizontal_cut_chars(plates)
+    flag = False
+    for i in Range(6):
+      for j in Range(10):
+        char_addr_list = horizontal_cut_chars(plates, i)
+        if len(char_addr_list) == 7:
+          flag = True
+          break
+      if flag:
+        break
     for i, addr in enumerate(char_addr_list):
         char_img = car_plate[chars_top:chars_bottom+1, addr[0]:addr[1]]      # chars_top:chars_bottom+1改成固定值
         char_img = cv2.resize(char_img, (char_w, char_h))
@@ -534,8 +544,8 @@ def recognize_plate_in_img(address):
     # imshow('a', img)
 
     #####  这个地方报错太多，暂时没用  ######
-    # images = detectPlateRough(img, img.shape[0], top_bottom_padding_rate=0.1)
-    # img = images[0]
+    images = detectPlateRough(img, img.shape[0], top_bottom_padding_rate=0.1)
+    img = images[0]
     # original_img, opened = Img_Outline(img)
     # img = findContours_img(original_img, opened)
 

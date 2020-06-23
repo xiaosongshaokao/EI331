@@ -441,8 +441,8 @@ def get_chars(car_plate):
     plates = car_plate[chars_top:chars_bottom + 1, :]
     imshow("vertical-subtract", plates)
     flag = False
-    for i in Range(6):
-      for j in Range(10):
+    for i in range(6):
+      for j in range(10):
         char_addr_list = horizontal_cut_chars(plates, i)
         if len(char_addr_list) == 7:
           flag = True
@@ -594,4 +594,3 @@ if __name__ == '__main__':
     #     except:
     #         pass
     recognize_plate_in_img(os.path.join(cur_dir, 'data/test/%s.jpg' % "008"))
-    os.system("pause")

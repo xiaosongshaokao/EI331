@@ -545,7 +545,8 @@ def recognize_plate_in_img(address):
 
     #####  这个地方报错太多，暂时没用  ######
     images = detectPlateRough(img, img.shape[0], top_bottom_padding_rate=0.1)
-    img = images[0]
+    if len(images)>0:
+        img = images[0]
     # original_img, opened = Img_Outline(img)
     # img = findContours_img(original_img, opened)
 
